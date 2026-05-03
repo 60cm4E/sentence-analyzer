@@ -135,16 +135,17 @@
           <div class="section-title"><span class="section-icon">🎯</span><span>퀴즈 설정</span></div>
         </div>
         <div class="section-body">
-          <div class="hw-group">
-            <label>Point 선택 (복수 선택 가능)</label>
-            <div class="hw-checkboxes" id="quizPointChecks"></div>
-          </div>
-          <div style="margin-top:20px;">
+          <h3 style="font-size:.95rem;color:var(--text2);margin-bottom:14px;">▶ 퀴즈 범위를 선택하세요 (유닛별 / 개별 포인트)</h3>
+          <div id="quizUnitGrid"></div>
+          <div style="margin-top:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <button class="btn btn-primary" id="startQuizBtn">퀴즈 시작 🚀</button>
+            <button class="btn btn-secondary btn-sm" id="quizSelectAllBtn">전체 선택</button>
+            <button class="btn btn-secondary btn-sm" id="quizDeselectAllBtn">전체 해제</button>
           </div>
         </div>
       </div>
     </div>
+
 
     <div id="quizMain" style="display:none;">
       <div class="quiz-header">

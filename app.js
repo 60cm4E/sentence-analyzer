@@ -331,23 +331,62 @@ $('nextPracticeBtn').addEventListener('click',()=>{
 
 // ── QUIZ MODE ──────────────────────────────────────────────────────────────
 function buildQuizPointChecks(){
-  const pts = getAllPoints();
-  const wrap = $('quizPointChecks'); wrap.innerHTML='';
-  pts.forEach(pt=>{
-    const lbl=el('label','hw-check-item checked');
-    lbl.dataset.val=pt.id;
-    lbl.innerHTML=`<input type="checkbox" checked> Point ${pt.id} ${pt.title}`;
-    lbl.addEventListener('click',function(){ this.classList.toggle('checked'); });
-    wrap.appendChild(lbl);
+  const wrap = $('quizUnitGrid'); wrap.innerHTML='';
+  ALL_UNITS.forEach(unit=>{
+    // Unit header row
+    const unitSection = el('div','quiz-unit-section');
+
+    const unitHeader = el('div','quiz-unit-header');
+    const unitToggle = el('button','quiz-unit-toggle selected');
+    unitToggle.dataset.unitId = unit.id;
+    unitToggle.innerHTML=`<span class="quiz-unit-icon">📘</span> Unit ${String(unit.id).padStart(2,'0')} <strong>${unit.title}</strong> <span class="quiz-unit-count">(${unit.points.length} Points)</span>`;
+    unitToggle.addEventListener('click',function(){
+      const selected = this.classList.toggle('selected');
+      const cards = unitSection.querySelectorAll('.quiz-point-card');
+      cards.forEach(c=>{ if(selected) c.classList.add('selected'); else c.classList.remove('selected'); });
+    });
+    unitHeader.appendChild(unitToggle);
+    unitSection.appendChild(unitHeader);
+
+    // Point cards grid
+    const grid = el('div','quiz-point-grid');
+    unit.points.forEach(pt=>{
+      const card = el('div','quiz-point-card selected');
+      card.dataset.pointId = pt.id;
+      card.innerHTML=`<div class="qpc-num">Point ${pt.id}</div>
+        <div class="qpc-title">${pt.title}</div>
+        <div class="qpc-formula">${pt.formula}</div>`;
+      card.addEventListener('click',function(){
+        this.classList.toggle('selected');
+        // Update unit toggle state
+        const allCards = grid.querySelectorAll('.quiz-point-card');
+        const selCards = grid.querySelectorAll('.quiz-point-card.selected');
+        if(selCards.length===allCards.length) unitToggle.classList.add('selected');
+        else unitToggle.classList.remove('selected');
+      });
+      grid.appendChild(card);
+    });
+    unitSection.appendChild(grid);
+    wrap.appendChild(unitSection);
   });
 }
 
+// Select All / Deselect All
+$('quizSelectAllBtn').addEventListener('click',()=>{
+  $('quizUnitGrid').querySelectorAll('.quiz-point-card').forEach(c=>c.classList.add('selected'));
+  $('quizUnitGrid').querySelectorAll('.quiz-unit-toggle').forEach(b=>b.classList.add('selected'));
+});
+$('quizDeselectAllBtn').addEventListener('click',()=>{
+  $('quizUnitGrid').querySelectorAll('.quiz-point-card').forEach(c=>c.classList.remove('selected'));
+  $('quizUnitGrid').querySelectorAll('.quiz-unit-toggle').forEach(b=>b.classList.remove('selected'));
+});
+
 $('startQuizBtn').addEventListener('click',()=>{
   const pts = getAllPoints();
-  const sel = [...$('quizPointChecks').querySelectorAll('.hw-check-item.checked')].map(l=>+l.dataset.val);
-  if(!sel.length){ showToast('Point를 하나 이상 선택하세요'); return; }
+  const selIds = [...$('quizUnitGrid').querySelectorAll('.quiz-point-card.selected')].map(c=>+c.dataset.pointId);
+  if(!selIds.length){ showToast('Point를 하나 이상 선택하세요'); return; }
   const items=[];
-  pts.filter(p=>sel.includes(p.id)).forEach(pt=>items.push(...pt.quiz));
+  pts.filter(p=>selIds.includes(p.id)).forEach(pt=>items.push(...pt.quiz));
   if(!items.length){ showToast('퀴즈 문항이 없습니다'); return; }
   State.quizItems = shuffle([...items]);
   State.quizIdx=0; State.quizCorrect=0;
@@ -357,6 +396,7 @@ $('startQuizBtn').addEventListener('click',()=>{
   $('quizQuestionArea').style.display='';
   renderQuizQ();
 });
+
 
 function renderQuizQ(){
   const q = State.quizItems[State.quizIdx];
