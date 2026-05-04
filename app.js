@@ -6,6 +6,7 @@ const State = {
   practicePoint: null, practiceIdx: 0,
   tokenLabels: {},
   selectedToken: null,
+  hintLevel: 0,
   quizItems: [], quizIdx: 0, quizCorrect: 0,
   quizAnswered: false,
   hwPoints: new Set(), hwTypes: new Set(['choice','analysis']), hwCount: 10,
@@ -220,6 +221,7 @@ function loadPracticeQuestion(){
   const items = [...pt.examples, ...pt.practice];
   State.tokenLabels = {};
   State.selectedToken = null;
+  State.hintLevel = 0;
   const total = items.length;
   const idx   = State.practiceIdx % total;
   const pct   = Math.round((idx/total)*100);
@@ -232,6 +234,8 @@ function loadPracticeQuestion(){
   $('nextPracticeBtn').style.display='none';
   $('checkAnswerBtn').style.display='';
   $('hintBtn').style.display='';
+  $('hintBtn').innerHTML='💡 힌트 1';
+  $('hintBtn').disabled=false;
   $('practiceSentenceCard').className='practice-sentence-card';
   $('selectedTokenName').textContent='-';
   renderPracticeTokens();
@@ -314,12 +318,47 @@ $('hintBtn').addEventListener('click',()=>{
   const fb   = $('practiceFeedback');
   fb.style.display='';
   fb.className='feedback-box hint';
-  const hints = item.tokens
-    .filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
-    .slice(0,3)
-    .map(tk=>`"${tk.t}" → ${tk.r.filter(r=>r!=='ANC')[0]||'?'}`)
-    .join('  |  ');
-  fb.textContent='💡 힌트: '+hints;
+
+  State.hintLevel++;
+
+  if(State.hintLevel === 1){
+    // 힌트 1: 문장 패턴 + 유도 질문
+    const roles = item.tokens
+      .filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
+      .map(tk=>tk.r.filter(r=>r!=='ANC')[0]||'M');
+    const uniqueRoles = [...new Set(roles)];
+    const pattern = roles.join(' + ');
+    let guideQ = '이 문장에서 ';
+    if(uniqueRoles.includes('S')) guideQ += "'누가/무엇이'(주어)";
+    if(uniqueRoles.includes('V')) guideQ += ", '~한다'(동사)";
+    if(uniqueRoles.includes('O')) guideQ += ", '무엇을'(목적어)";
+    if(uniqueRoles.includes('SC')) guideQ += ", '어떠하다/무엇이다'(보어)";
+    if(uniqueRoles.includes('IO')) guideQ += ", '누구에게'(간접목적어)";
+    if(uniqueRoles.includes('DO')) guideQ += ", '무엇을'(직접목적어)";
+    if(uniqueRoles.includes('OC')) guideQ += ", '~하게/~로'(목적격보어)";
+    if(uniqueRoles.includes('M')) guideQ += ", '언제/어디서/어떻게'(수식어)";
+    guideQ += '를 찾아보세요.';
+    fb.innerHTML=`💡 <strong>힌트 1 — 문장 패턴</strong><br>이 문장은 <strong>${pattern}</strong> 구조입니다.<br>${guideQ}`;
+    $('hintBtn').innerHTML='💡 힌트 2';
+  } else if(State.hintLevel === 2){
+    // 힌트 2: 직독직해 (한글 해석을 슬래시로 구분)
+    fb.innerHTML=`💡 <strong>힌트 2 — 직독직해</strong><br>🇰🇷 ${item.translation}<br><span style="font-size:.82rem;color:#9A3412;">↑ 한글 해석을 읽고, 각 영어 단어가 어떤 역할인지 대입해 보세요.</span>`;
+    $('hintBtn').innerHTML='💡 힌트 3';
+  } else if(State.hintLevel === 3){
+    // 힌트 3: 성분 개수만 알려주기
+    const roleCounts = {};
+    item.tokens
+      .filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
+      .forEach(tk=>{
+        const role = tk.r.filter(r=>r!=='ANC')[0]||'M';
+        const ko = LABELS[role]?.ko || role;
+        roleCounts[ko] = (roleCounts[ko]||0)+1;
+      });
+    const countStr = Object.entries(roleCounts).map(([k,v])=>`${k} ${v}개`).join(', ');
+    fb.innerHTML=`💡 <strong>힌트 3 — 성분 개수</strong><br>이 문장에는 <strong>${countStr}</strong>가 있어요.`;
+    $('hintBtn').innerHTML='✨ 더 이상 힌트 없음';
+    $('hintBtn').disabled=true;
+  }
 });
 
 $('nextPracticeBtn').addEventListener('click',()=>{
