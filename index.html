@@ -223,6 +223,14 @@
               <input type="text" id="hwDate" placeholder="날짜" style="padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-family:inherit;font-size:.9rem;width:140px;">
             </div>
           </div>
+          <div class="hw-group">
+            <label>🖨️ 인쇄 범위</label>
+            <div class="hw-radios" id="hwPrintMode">
+              <label class="hw-radio-item checked" data-val="both"><input type="radio" name="hwPrint" checked> 문제+정답</label>
+              <label class="hw-radio-item" data-val="questions"><input type="radio" name="hwPrint"> 문제만</label>
+              <label class="hw-radio-item" data-val="answers"><input type="radio" name="hwPrint"> 정답만</label>
+            </div>
+          </div>
           <div class="hw-actions">
             <button class="btn btn-primary" id="generateHwBtn">📄 숙제 생성</button>
             <button class="btn btn-secondary" id="printHwBtn" style="display:none;">🖨️ 인쇄</button>
@@ -232,7 +240,8 @@
     </div>
 
     <div id="hw-preview">
-      <div id="hw-print-content"></div>
+      <div id="hw-print-questions"></div>
+      <div id="hw-print-answers"></div>
     </div>
   </div>
 </div>

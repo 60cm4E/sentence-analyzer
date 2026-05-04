@@ -424,18 +424,55 @@ body {
 }
 #hw-preview.visible { display: block; }
 
+/* Answer page on-screen style */
+.print-answer-page {
+  border-top: 3px solid var(--primary);
+  padding-top: 24px;
+  margin-top: 32px;
+}
+.print-answer-list {
+  column-count: 2;
+  column-gap: 24px;
+}
+.print-answer-item {
+  font-size: .9rem;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  break-inside: avoid;
+  line-height: 1.6;
+}
+
 /* ─── PRINT STYLES ─── */
 @media print {
-  #app-header, .tab-btn, .hw-form, .hw-actions, #hw-preview > h3 > button { display: none !important; }
+  #app-header, .tab-btn, .section-card, .hw-form, .hw-actions { display: none !important; }
   #hw-preview { display: block !important; border: none; padding: 0; margin: 0; }
   body { background: white; }
+  .page-wrap { padding: 0; margin: 0; max-width: none; }
   .print-title { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 20pt; }
   .print-q { margin-bottom: 14pt; page-break-inside: avoid; }
   .print-q-num { font-weight: bold; font-size: 10pt; }
   .print-sentence { font-size: 11pt; margin: 4pt 0 8pt; }
   .print-blank { display: inline-block; min-width: 60pt; border-bottom: 1pt solid black; }
-  .print-ans { font-size: 8pt; color: #666; }
-  .print-answer-key { margin-top: 20pt; border-top: 1pt solid #ccc; padding-top: 10pt; }
+
+  /* 정답은 반드시 새 페이지에서 시작 */
+  #hw-print-answers {
+    page-break-before: always;
+  }
+  .print-answer-page {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .print-answer-list {
+    column-count: 2;
+    column-gap: 20pt;
+  }
+  .print-answer-item {
+    font-size: 9pt;
+    padding: 4pt 0;
+    border-bottom: .5pt solid #ddd;
+    break-inside: avoid;
+  }
 }
 
 /* ─── TOAST / ANIMATION ─── */

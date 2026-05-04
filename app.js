@@ -474,6 +474,8 @@ $('quizToSetupBtn').addEventListener('click',()=>{
 });
 
 // ── HOMEWORK ───────────────────────────────────────────────────────────────
+let hwPrintMode = 'both'; // 'both' | 'questions' | 'answers'
+
 function buildHwUI(){
   const pts = getAllPoints();
   const wrap=$('hwPointChecks'); wrap.innerHTML='';
@@ -494,6 +496,28 @@ function buildHwUI(){
       State.hwCount=+this.dataset.val;
     });
   });
+  // Print mode radios
+  $('hwPrintMode').querySelectorAll('.hw-radio-item').forEach(l=>{
+    l.addEventListener('click',function(){
+      $('hwPrintMode').querySelectorAll('.hw-radio-item').forEach(x=>x.classList.remove('checked'));
+      this.classList.add('checked');
+      hwPrintMode = this.dataset.val;
+      applyPrintMode();
+    });
+  });
+}
+
+function applyPrintMode(){
+  const qEl = $('hw-print-questions');
+  const aEl = $('hw-print-answers');
+  if(!qEl || !aEl) return;
+  if(hwPrintMode==='both'){
+    qEl.style.display=''; aEl.style.display='';
+  } else if(hwPrintMode==='questions'){
+    qEl.style.display=''; aEl.style.display='none';
+  } else {
+    qEl.style.display='none'; aEl.style.display='';
+  }
 }
 
 $('generateHwBtn').addEventListener('click',generateHomework);
@@ -518,55 +542,69 @@ function generateHomework(){
   const cls   = $('hwClassName').value  || '______';
   const date  = $('hwDate').value       || new Date().toLocaleDateString('ko-KR');
 
-  let html=`<div class="print-title">📝 영어 문장분석 숙제</div>
+  const headerHtml = `<div class="print-title">📝 영어 문장분석 숙제</div>
   <div style="display:flex;gap:24px;margin-bottom:20px;font-size:.9rem;">
     <span>이름: <strong>${name}</strong></span>
     <span>반: <strong>${cls}</strong></span>
     <span>날짜: <strong>${date}</strong></span>
   </div>`;
 
+  let questionsHtml = headerHtml;
   const answers=[];
+
   selected.forEach((item,i)=>{
     const num=i+1;
     const pt=pts.find(p=>p.id===item.pointId);
-    html+=`<div class="print-q"><div class="print-q-num">${num}. [Point ${item.pointId} ${pt.title}]</div>`;
+    questionsHtml+=`<div class="print-q"><div class="print-q-num">${num}. [Point ${item.pointId} ${pt.title}]</div>`;
 
     if(item.type==='choice'){
       const filled=item.sentence.replace('___',`<span class="print-blank">______</span>`);
-      html+=`<div class="print-sentence">${filled}</div>`;
+      questionsHtml+=`<div class="print-sentence">${filled}</div>`;
       const opts=item.choices.map((c,ci)=>`(${ci+1}) ${c}`).join('  ');
-      html+=`<div style="margin-bottom:4px;font-size:.85rem;">${opts}</div>`;
+      questionsHtml+=`<div style="margin-bottom:4px;font-size:.85rem;">${opts}</div>`;
       answers.push(`${num}. (${item.answer+1}) ${item.choices[item.answer]}`);
     } else if(item.type==='analysis'){
       const raw=item.tokens.map(tk=>tk.t).filter(t=>t!=='/'&&t!=='.').join(' ');
-      html+=`<div class="print-sentence">${raw}</div>`;
-      html+=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">`;
+      questionsHtml+=`<div class="print-sentence">${raw}</div>`;
+      questionsHtml+=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">`;
       item.tokens.forEach(tk=>{
         if(tk.r.includes('DIV')||tk.r.includes('PUNC')) return;
-        html+=`<span style="border:1px solid #ccc;border-radius:4px;padding:3px 10px;font-size:.85rem;">
+        questionsHtml+=`<span style="border:1px solid #ccc;border-radius:4px;padding:3px 10px;font-size:.85rem;">
           ${tk.t}<br><span style="font-size:.7rem;color:#999;">___</span></span>`;
       });
-      html+=`</div>`;
+      questionsHtml+=`</div>`;
       const ans=item.tokens.filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
         .map(tk=>`${tk.t}(${tk.r.filter(r=>r!=='ANC')[0]||'?'})`).join(' ');
       answers.push(`${num}. ${ans}`);
     } else if(item.type==='translation'){
       const raw=item.tokens.map(tk=>tk.t).filter(t=>t!=='/'&&t!=='.').join(' ');
-      html+=`<div class="print-sentence">${raw}</div>`;
-      html+=`<div style="border:1px solid #ccc;min-height:32px;border-radius:4px;margin-bottom:4px;padding:4px 8px;font-size:.85rem;color:#aaa;">해석: ___________________________</div>`;
+      questionsHtml+=`<div class="print-sentence">${raw}</div>`;
+      questionsHtml+=`<div style="border:1px solid #ccc;min-height:32px;border-radius:4px;margin-bottom:4px;padding:4px 8px;font-size:.85rem;color:#aaa;">해석: ___________________________</div>`;
       answers.push(`${num}. ${item.translation}`);
     }
-    html+=`</div>`;
+    questionsHtml+=`</div>`;
   });
 
-  html+=`<div class="print-answer-key"><strong>정답</strong><br>${answers.join('<br>')}</div>`;
+  // 정답 페이지 (별도 페이지로 인쇄)
+  let answersHtml = `<div class="print-answer-page">
+    <div class="print-title">📋 정답지</div>
+    <div style="display:flex;gap:24px;margin-bottom:20px;font-size:.9rem;">
+      <span>이름: <strong>${name}</strong></span>
+      <span>반: <strong>${cls}</strong></span>
+      <span>날짜: <strong>${date}</strong></span>
+    </div>
+    <div class="print-answer-list">${answers.map(a=>`<div class="print-answer-item">${a}</div>`).join('')}</div>
+  </div>`;
 
-  $('hw-print-content').innerHTML=html;
+  $('hw-print-questions').innerHTML = questionsHtml;
+  $('hw-print-answers').innerHTML = answersHtml;
   $('hw-preview').classList.add('visible');
   $('printHwBtn').style.display='';
+  applyPrintMode();
 }
 
 $('printHwBtn').addEventListener('click',()=>window.print());
+
 
 // ── Shuffle ────────────────────────────────────────────────────────────────
 function shuffle(arr){
