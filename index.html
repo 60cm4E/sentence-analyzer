@@ -117,10 +117,30 @@
         <div class="practice-actions">
           <button class="btn btn-primary" id="checkAnswerBtn">✅ 정답 확인</button>
           <button class="btn btn-hint" id="hintBtn">💡 힌트</button>
+          <button class="btn btn-secondary" id="retryPracticeBtn" style="display:none;">🔄 다시 풀기</button>
           <button class="btn btn-secondary" id="nextPracticeBtn" style="display:none;">다음 문장 →</button>
         </div>
         <div id="practiceFeedback" style="display:none;"></div>
         <div class="example-translation" id="practiceTranslation" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- 연습 결과 / 오답 풀기 -->
+    <div id="practiceResult" style="display:none;">
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon">📊</span><span>연습 결과</span></div>
+        </div>
+        <div class="section-body" style="text-align:center;">
+          <div class="stars" id="practiceStars"></div>
+          <div class="quiz-result-score" id="practiceResultScore"></div>
+          <div class="quiz-result-msg" id="practiceResultMsg"></div>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button class="btn btn-primary" id="retryWrongBtn" style="display:none;">❌ 오답만 다시 풀기</button>
+            <button class="btn btn-secondary" id="retryAllBtn">🔄 전체 다시 풀기</button>
+            <button class="btn btn-secondary" id="practiceToSelectBtn">← Point 선택</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

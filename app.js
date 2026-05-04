@@ -4,9 +4,10 @@
 const State = {
   streak: 0, xp: 0,
   practicePoint: null, practiceIdx: 0,
+  practiceQueue: null, wrongIndices: [], isWrongMode: false,
   tokenLabels: {},
   selectedToken: null,
-  hintLevel: 0,
+  hintLevel: 0, hintUsed: false,
   quizItems: [], quizIdx: 0, quizCorrect: 0,
   quizAnswered: false,
   hwPoints: new Set(), hwTypes: new Set(['choice','analysis']), hwCount: 10,
@@ -182,8 +183,13 @@ function buildPracticePointGrid(){
 function openPracticePoint(pt){
   State.practicePoint = pt;
   State.practiceIdx   = 0;
+  State.hintLevel     = 0;
+  State.practiceQueue = [...pt.examples, ...pt.practice];
+  State.wrongIndices  = [];
+  State.isWrongMode   = false;
   $('practicePointSelect').style.display='none';
   $('practiceMain').style.display='';
+  $('practiceResult').style.display='none';
   $('practicePointLabel').textContent=`Point ${pt.id}  ${pt.title}`;
   buildLabelButtons();
   loadPracticeQuestion();
@@ -191,6 +197,7 @@ function openPracticePoint(pt){
 
 $('practiceBackBtn').addEventListener('click',()=>{
   $('practiceMain').style.display='none';
+  $('practiceResult').style.display='none';
   $('practicePointSelect').style.display='';
 });
 
@@ -218,33 +225,52 @@ function applyLabel(key){
 
 function loadPracticeQuestion(){
   const pt = State.practicePoint;
-  const items = [...pt.examples, ...pt.practice];
+  const items = State.practiceQueue || [...pt.examples, ...pt.practice];
+  if(!State.practiceQueue) State.practiceQueue = items;
   State.tokenLabels = {};
   State.selectedToken = null;
-  State.hintLevel = 0;
+  State.hintUsed = false; // 이번 시도에서 힌트를 사용했는지
   const total = items.length;
-  const idx   = State.practiceIdx % total;
+  const idx   = State.practiceIdx;
+  if(idx >= total){
+    // 모든 문제 완료 → 결과 화면
+    showPracticeResult();
+    return;
+  }
   const pct   = Math.round((idx/total)*100);
   $('practiceProgressBar').style.width=pct+'%';
   $('practiceProgressText').textContent=`${idx+1} / ${total}`;
-  $('practiceQNum').textContent = idx < pt.examples.length
-    ? `분석 예문 ${idx+1} (따라해 보세요)` : `연습 문장 ${idx - pt.examples.length + 1}`;
+  const item = items[idx];
+  const isExample = !State.isWrongMode && pt.examples.includes(item);
+  if(isExample){
+    const exIdx = pt.examples.indexOf(item);
+    $('practiceQNum').textContent = `분석 예문 ${exIdx+1} (따라해 보세요)`;
+  } else {
+    $('practiceQNum').textContent = State.isWrongMode
+      ? `오답 복습 ${idx+1} / ${total}` : `연습 문장 ${idx+1}`;
+  }
   $('practiceTranslation').style.display='none';
   $('practiceFeedback').style.display='none';
   $('nextPracticeBtn').style.display='none';
+  $('retryPracticeBtn').style.display='none';
   $('checkAnswerBtn').style.display='';
+  // 힌트 레벨에 따른 버튼 텍스트 (hintLevel은 시도별로 증가)
+  const hLv = Math.min(State.hintLevel + 1, 3);
   $('hintBtn').style.display='';
-  $('hintBtn').innerHTML='💡 힌트 1';
-  $('hintBtn').disabled=false;
+  $('hintBtn').innerHTML=`💡 힌트 ${hLv}`;
+  $('hintBtn').disabled = (State.hintLevel >= 3);
   $('practiceSentenceCard').className='practice-sentence-card';
   $('selectedTokenName').textContent='-';
+  $('practiceResult').style.display='none';
+  $('practiceMain').style.display='';
   renderPracticeTokens();
 }
 
 function renderPracticeTokens(){
   const pt   = State.practicePoint;
-  const items= [...pt.examples,...pt.practice];
-  const item = items[State.practiceIdx % items.length];
+  const items= State.practiceQueue || [...pt.examples,...pt.practice];
+  const item = items[State.practiceIdx];
+  if(!item) return;
   const wrap = $('practiceTokens'); wrap.innerHTML='';
   item.tokens.forEach((tk,i)=>{
     if(tk.r.includes('DIV')){
@@ -279,8 +305,9 @@ function renderPracticeTokens(){
 
 $('checkAnswerBtn').addEventListener('click',()=>{
   const pt   = State.practicePoint;
-  const items= [...pt.examples,...pt.practice];
-  const item = items[State.practiceIdx % items.length];
+  const items= State.practiceQueue || [...pt.examples,...pt.practice];
+  const item = items[State.practiceIdx];
+  if(!item) return;
   let correct=0, total=0, wrong=[];
   item.tokens.forEach((tk,i)=>{
     if(tk.r.includes('DIV')||tk.r.includes('PUNC')) return;
@@ -297,32 +324,45 @@ $('checkAnswerBtn').addEventListener('click',()=>{
   $('practiceTranslation').textContent='🇰🇷 '+item.translation;
   $('checkAnswerBtn').style.display='none';
   $('hintBtn').style.display='none';
-  $('nextPracticeBtn').style.display='';
+
   if(pct>=80){
     fb.className='feedback-box correct';
     fb.textContent=`✅ 정확도 ${pct}%  잘했어요! (+${Math.round(pct/20)} XP)`;
     $('practiceSentenceCard').classList.add('correct');
     addXP(Math.round(pct/20));
     if(pct===100) showToast('🎉 완벽한 분석!');
+    // 정답 → 다음 문장으로
+    $('nextPracticeBtn').style.display='';
+    $('retryPracticeBtn').style.display='none';
   } else {
     fb.className='feedback-box wrong';
     fb.textContent=`❌ 정확도 ${pct}%  다시 확인: ${wrong.slice(0,3).join(' / ')}`;
     $('practiceSentenceCard').classList.add('wrong');
+    // 오답 기록
+    if(!State.wrongIndices.includes(State.practiceIdx)){
+      State.wrongIndices.push(State.practiceIdx);
+    }
+    // 오답 → "다시 풀기" + "다음 문장" 둘 다 보여줌
+    $('retryPracticeBtn').style.display='';
+    $('nextPracticeBtn').style.display='';
   }
 });
 
+// 힌트: 한 시도당 한 번만, 레벨은 다시 풀 때 올라감
 $('hintBtn').addEventListener('click',()=>{
+  if(State.hintUsed) return; // 이미 사용
+  State.hintUsed = true;
   const pt   = State.practicePoint;
-  const items= [...pt.examples,...pt.practice];
-  const item = items[State.practiceIdx % items.length];
+  const items= State.practiceQueue || [...pt.examples,...pt.practice];
+  const item = items[State.practiceIdx];
+  if(!item) return;
   const fb   = $('practiceFeedback');
   fb.style.display='';
   fb.className='feedback-box hint';
 
-  State.hintLevel++;
+  const currentHint = State.hintLevel + 1; // 다음에 보여줄 레벨
 
-  if(State.hintLevel === 1){
-    // 힌트 1: 문장 패턴 + 유도 질문
+  if(currentHint === 1){
     const roles = item.tokens
       .filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
       .map(tk=>tk.r.filter(r=>r!=='ANC')[0]||'M');
@@ -339,13 +379,9 @@ $('hintBtn').addEventListener('click',()=>{
     if(uniqueRoles.includes('M')) guideQ += ", '언제/어디서/어떻게'(수식어)";
     guideQ += '를 찾아보세요.';
     fb.innerHTML=`💡 <strong>힌트 1 — 문장 패턴</strong><br>이 문장은 <strong>${pattern}</strong> 구조입니다.<br>${guideQ}`;
-    $('hintBtn').innerHTML='💡 힌트 2';
-  } else if(State.hintLevel === 2){
-    // 힌트 2: 직독직해 (한글 해석을 슬래시로 구분)
+  } else if(currentHint === 2){
     fb.innerHTML=`💡 <strong>힌트 2 — 직독직해</strong><br>🇰🇷 ${item.translation}<br><span style="font-size:.82rem;color:#9A3412;">↑ 한글 해석을 읽고, 각 영어 단어가 어떤 역할인지 대입해 보세요.</span>`;
-    $('hintBtn').innerHTML='💡 힌트 3';
-  } else if(State.hintLevel === 3){
-    // 힌트 3: 성분 개수만 알려주기
+  } else {
     const roleCounts = {};
     item.tokens
       .filter(tk=>!tk.r.includes('DIV')&&!tk.r.includes('PUNC'))
@@ -356,16 +392,89 @@ $('hintBtn').addEventListener('click',()=>{
       });
     const countStr = Object.entries(roleCounts).map(([k,v])=>`${k} ${v}개`).join(', ');
     fb.innerHTML=`💡 <strong>힌트 3 — 성분 개수</strong><br>이 문장에는 <strong>${countStr}</strong>가 있어요.`;
-    $('hintBtn').innerHTML='✨ 더 이상 힌트 없음';
-    $('hintBtn').disabled=true;
   }
+  $('hintBtn').disabled=true;
+  $('hintBtn').innerHTML='💡 힌트 사용완료';
+});
+
+// 다시 풀기: 같은 문장 재시도, 힌트 레벨 올림
+$('retryPracticeBtn').addEventListener('click',()=>{
+  State.hintLevel = Math.min(State.hintLevel + 1, 3);
+  State.tokenLabels = {};
+  State.selectedToken = null;
+  State.hintUsed = false;
+  $('practiceFeedback').style.display='none';
+  $('practiceTranslation').style.display='none';
+  $('retryPracticeBtn').style.display='none';
+  $('nextPracticeBtn').style.display='none';
+  $('checkAnswerBtn').style.display='';
+  const hLv = Math.min(State.hintLevel + 1, 3);
+  $('hintBtn').style.display='';
+  $('hintBtn').innerHTML=`💡 힌트 ${hLv}`;
+  $('hintBtn').disabled = (State.hintLevel >= 3);
+  $('practiceSentenceCard').className='practice-sentence-card';
+  $('selectedTokenName').textContent='-';
+  renderPracticeTokens();
 });
 
 $('nextPracticeBtn').addEventListener('click',()=>{
-  const pt   = State.practicePoint;
-  const total= pt.examples.length+pt.practice.length;
-  State.practiceIdx = (State.practiceIdx+1) % total;
+  State.practiceIdx++;
+  State.hintLevel = 0; // 새 문장은 힌트 리셋
   loadPracticeQuestion();
+});
+
+// 연습 결과 화면
+function showPracticeResult(){
+  $('practiceMain').style.display='none';
+  $('practiceResult').style.display='';
+  const total = (State.practiceQueue || []).length;
+  const wrongCount = State.wrongIndices.length;
+  const correctCount = total - wrongCount;
+  const pct = Math.round((correctCount/total)*100);
+  $('practiceResultScore').textContent = `${correctCount} / ${total} (${pct}%)`;
+  $('practiceStars').textContent = pct>=90?'⭐⭐⭐':pct>=70?'⭐⭐':'⭐';
+  $('practiceResultMsg').textContent = pct>=90?'완벽해요! 문법 마스터! 🏆'
+    :pct>=70?'잘했어요! 조금만 더 연습해요 💪'
+    :'다시 한번 공부하고 도전해요 📖';
+  if(wrongCount > 0){
+    $('retryWrongBtn').style.display='';
+    $('retryWrongBtn').textContent=`❌ 오답 ${wrongCount}문제 다시 풀기`;
+  } else {
+    $('retryWrongBtn').style.display='none';
+  }
+}
+
+// 오답만 다시 풀기
+$('retryWrongBtn').addEventListener('click',()=>{
+  const pt = State.practicePoint;
+  const allItems = [...pt.examples, ...pt.practice];
+  // 원래 큐에서 오답 인덱스에 해당하는 문제만 추출
+  const origQueue = State.practiceQueue || allItems;
+  const wrongItems = State.wrongIndices.map(i=>origQueue[i]).filter(Boolean);
+  State.practiceQueue = wrongItems;
+  State.practiceIdx = 0;
+  State.hintLevel = 0;
+  State.wrongIndices = [];
+  State.isWrongMode = true;
+  loadPracticeQuestion();
+});
+
+// 전체 다시 풀기
+$('retryAllBtn').addEventListener('click',()=>{
+  const pt = State.practicePoint;
+  State.practiceQueue = [...pt.examples, ...pt.practice];
+  State.practiceIdx = 0;
+  State.hintLevel = 0;
+  State.wrongIndices = [];
+  State.isWrongMode = false;
+  loadPracticeQuestion();
+});
+
+// Point 선택으로 돌아가기
+$('practiceToSelectBtn').addEventListener('click',()=>{
+  $('practiceResult').style.display='none';
+  $('practiceMain').style.display='none';
+  $('practicePointSelect').style.display='';
 });
 
 // ── QUIZ MODE ──────────────────────────────────────────────────────────────
