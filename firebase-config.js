@@ -3,12 +3,13 @@
 // ⚠️ 아래 config 값을 Firebase Console에서 복사한 값으로 교체하세요!
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCQ-1vFKfJBKbwwT-HR9TVWsRv888grDls",
+  authDomain: "sentence-analyzer-bb4b4.firebaseapp.com",
+  projectId: "sentence-analyzer-bb4b4",
+  storageBucket: "sentence-analyzer-bb4b4.firebasestorage.app",
+  messagingSenderId: "322053523784",
+  appId: "1:322053523784:web:2acd0673c09c15233c8b7d",
+  measurementId: "G-411BXNQ54Y"
 };
 
 firebase.initializeApp(firebaseConfig);
