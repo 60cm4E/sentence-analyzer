@@ -37,6 +37,17 @@ try {
   firebaseOk = false;
 }
 
+// 리다이렉트 로그인 결과 처리
+if (firebaseOk && fbAuth) {
+  fbAuth.getRedirectResult().then(result => {
+    if (result && result.user) {
+      console.log('✅ Redirect login success:', result.user.displayName);
+    }
+  }).catch(e => {
+    console.warn('Redirect result error:', e);
+  });
+}
+
 function isFirebaseReady() {
   return firebaseOk;
 }
@@ -50,9 +61,16 @@ function loginTeacher(pin) {
 async function loginWithGoogle() {
   if (!isFirebaseReady()) { showToast('⚠️ Firebase 연결 중...'); return null; }
   try {
+    // 먼저 팝업 시도, 차단되면 리다이렉트로 대체
     const result = await fbAuth.signInWithPopup(googleProvider);
     return result.user;
   } catch (e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      // 팝업 차단 → 리다이렉트 방식으로 전환
+      showToast('🔄 Google 로그인 페이지로 이동합니다...');
+      fbAuth.signInWithRedirect(googleProvider);
+      return null;
+    }
     console.error('Login error:', e);
     showToast('로그인 실패: ' + e.message);
     return null;
