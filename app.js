@@ -151,6 +151,8 @@ function openStudyPoint(pt){
   });
 
   $('goToPracticeBtn').dataset.pointId = pt.id;
+  // Firebase 진도 저장
+  autoSaveStudy(pt.id);
 }
 
 $('studyBackBtn').addEventListener('click',()=>{
@@ -442,6 +444,10 @@ function showPracticeResult(){
   } else {
     $('retryWrongBtn').style.display='none';
   }
+  // Firebase 진도 저장
+  if(State.practicePoint){
+    autoSavePractice(State.practicePoint.id, pct);
+  }
 }
 
 // 오답만 다시 풀기
@@ -603,6 +609,9 @@ function showQuizResult(){
   $('quizResultMsg').textContent = pct>=90?'완벽해요! 문법 마스터! 🏆'
     :pct>=70?'잘했어요! 조금만 더 연습해요 💪'
     :'다시 한번 공부하고 도전해요 📖';
+  // Firebase 진도 저장
+  const quizPointIds = [...new Set(State.quizItems.map(q=>q.pointId))];
+  autoSaveQuiz(quizPointIds, pct);
 }
 
 $('retryQuizBtn').addEventListener('click',()=>{
@@ -773,4 +782,231 @@ function shuffle(arr){
   buildPracticePointGrid();
   buildQuizPointChecks();
   buildHwUI();
+
+  // Firebase Auth 리스너
+  if(typeof fbAuth !== 'undefined' && isFirebaseReady()){
+    fbAuth.onAuthStateChanged(async (user)=>{
+      if(user){
+        currentUser = user;
+        isTeacher = false;
+        await ensureStudentDoc(user);
+        // Firestore에서 XP/streak 복원
+        if(studentDoc){
+          State.xp = studentDoc.xp || 0;
+          State.streak = studentDoc.streak || 0;
+          $('xpCount').textContent = State.xp;
+          $('streakCount').textContent = State.streak;
+          save();
+        }
+        updateAuthUI();
+        showToast(`👋 ${user.displayName || '학생'}님 환영합니다!`);
+      } else {
+        currentUser = null;
+        isTeacher = false;
+        studentDoc = null;
+        updateAuthUI();
+      }
+    });
+  }
+
+  // 로그인 모달 이벤트
+  if($('googleLoginBtn')){
+    $('googleLoginBtn').addEventListener('click', async ()=>{
+      const user = await loginWithGoogle();
+      if(user) closeLoginModalFn();
+    });
+  }
+  if($('teacherLoginBtn')){
+    $('teacherLoginBtn').addEventListener('click', ()=>{
+      const pin = $('teacherPinInput').value;
+      if(loginTeacher(pin)){
+        isTeacher = true;
+        currentUser = { displayName: '교사', photoURL: '' };
+        updateAuthUI();
+        closeLoginModalFn();
+        showToast('🎓 교사 모드로 접속했습니다');
+        // 대시보드 탭으로 이동
+        switchTab('dashboard');
+        loadDashboard();
+      } else {
+        showToast('❌ 비밀번호가 틀렸습니다');
+      }
+    });
+  }
+  if($('closeLoginModal')){
+    $('closeLoginModal').addEventListener('click', closeLoginModalFn);
+  }
+  if($('loginModal')){
+    $('loginModal').addEventListener('click', (e)=>{
+      if(e.target === $('loginModal')) closeLoginModalFn();
+    });
+  }
+  if($('refreshDashBtn')){
+    $('refreshDashBtn').addEventListener('click', loadDashboard);
+  }
 })();
+
+// ── Auth UI ───────────────────────────────────────────────────────────────
+function openLoginModal(){
+  $('loginModal').style.display='';
+}
+function closeLoginModalFn(){
+  $('loginModal').style.display='none';
+  $('teacherPinInput').value='';
+}
+function updateAuthUI(){
+  if(currentUser){
+    $('authBtn').style.display='none';
+    $('userInfo').style.display='';
+    $('userName').textContent = currentUser.displayName || '사용자';
+    if(currentUser.photoURL){
+      $('userAvatar').src = currentUser.photoURL;
+      $('userAvatar').style.display='';
+    } else {
+      $('userAvatar').style.display='none';
+    }
+    if(isTeacher){
+      $('userName').innerHTML = '<span class="teacher-badge">교사</span>';
+      $('tabDashboard').style.display='';
+    } else {
+      $('tabDashboard').style.display='none';
+    }
+  } else {
+    $('authBtn').style.display='';
+    $('userInfo').style.display='none';
+    $('tabDashboard').style.display='none';
+  }
+}
+
+function switchTab(tabName){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab===tabName);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>{
+    p.classList.toggle('active', p.id==='panel-'+tabName);
+  });
+}
+
+// ── 진도 자동 저장 (학습/연습/퀴즈 완료 시 호출) ──
+async function autoSaveStudy(pointId){
+  if(!currentUser || isTeacher || !isFirebaseReady()) return;
+  try {
+    await saveProgressToFirebase(pointId, { studied: true });
+  } catch(e){ console.warn('Save failed:', e); }
+}
+async function autoSavePractice(pointId, score){
+  if(!currentUser || isTeacher || !isFirebaseReady()) return;
+  try {
+    await saveProgressToFirebase(pointId, { practiced: true, practiceScore: score });
+    await syncStatsToFirebase();
+  } catch(e){ console.warn('Save failed:', e); }
+}
+async function autoSaveQuiz(pointIds, score){
+  if(!currentUser || isTeacher || !isFirebaseReady()) return;
+  try {
+    for(const pid of pointIds){
+      await saveProgressToFirebase(pid, { quizScore: score });
+    }
+    await syncStatsToFirebase();
+  } catch(e){ console.warn('Save failed:', e); }
+}
+
+// ── 교사 대시보드 ──────────────────────────────────────────────────────────
+async function loadDashboard(){
+  const wrap = $('dashboardContent');
+  wrap.innerHTML='<div class="empty-state"><div class="empty-icon">⏳</div><p>학생 데이터를 불러오는 중...</p></div>';
+  try {
+    const students = await getAllStudents();
+    if(!students.length){
+      wrap.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>아직 등록된 학생이 없습니다.</p></div>';
+      return;
+    }
+    // 각 학생의 진도 가져오기
+    const totalPoints = getAllPoints().length;
+    let html = `<div style="margin-bottom:12px;font-size:.88rem;color:var(--text2);">총 ${students.length}명의 학생 | ${totalPoints}개 포인트</div>`;
+    html += `<div style="overflow-x:auto;"><table class="dash-table">
+      <thead><tr>
+        <th>학생</th><th>XP</th><th>학습</th><th>연습</th><th>퀴즈</th><th>마지막 접속</th>
+      </tr></thead><tbody>`;
+
+    for(const s of students){
+      const progress = await getStudentProgress(s.id);
+      const pKeys = Object.keys(progress);
+      const studied = pKeys.filter(k=>progress[k].studied).length;
+      const practiced = pKeys.filter(k=>progress[k].practiced).length;
+      const quizzed = pKeys.filter(k=>progress[k].quizScore!=null).length;
+      const lastLogin = s.lastLogin ? new Date(s.lastLogin.seconds*1000).toLocaleDateString('ko-KR') : '-';
+      const studiedPct = Math.round((studied/totalPoints)*100);
+      const practicedPct = Math.round((practiced/totalPoints)*100);
+
+      html += `<tr data-uid="${s.id}" class="dash-student-row" style="cursor:pointer;">
+        <td><div class="student-name">
+          ${s.photoURL ? `<img src="${s.photoURL}" alt="">` : ''}
+          ${s.name}
+        </div></td>
+        <td><strong>${s.xp||0}</strong></td>
+        <td>
+          <div class="dash-progress-bar"><div class="dash-progress-fill" style="width:${studiedPct}%"></div></div>
+          <span style="font-size:.75rem;margin-left:4px;">${studied}/${totalPoints}</span>
+        </td>
+        <td>
+          <div class="dash-progress-bar"><div class="dash-progress-fill" style="width:${practicedPct}%"></div></div>
+          <span style="font-size:.75rem;margin-left:4px;">${practiced}/${totalPoints}</span>
+        </td>
+        <td>${quizzed}회</td>
+        <td style="font-size:.8rem;color:var(--text3);">${lastLogin}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+    html += '<div id="dashDetailArea"></div>';
+    wrap.innerHTML = html;
+
+    // 학생 클릭 → 상세 진도
+    wrap.querySelectorAll('.dash-student-row').forEach(row=>{
+      row.addEventListener('click', async ()=>{
+        const uid = row.dataset.uid;
+        const students2 = await getAllStudents();
+        const stu = students2.find(s=>s.id===uid);
+        const progress = await getStudentProgress(uid);
+        renderStudentDetail(stu, progress);
+      });
+    });
+  } catch(e){
+    wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><p>데이터 로드 실패: ${e.message}</p></div>`;
+  }
+}
+
+function renderStudentDetail(student, progress){
+  const area = $('dashDetailArea');
+  if(!area) return;
+  const allPts = getAllPoints();
+  let html = `<div class="dash-detail-card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      ${student.photoURL ? `<img src="${student.photoURL}" style="width:40px;height:40px;border-radius:50%;">` : ''}
+      <div>
+        <div style="font-weight:700;font-size:1.05rem;">${student.name}</div>
+        <div style="font-size:.82rem;color:var(--text2);">${student.email||''} | XP: ${student.xp||0} | Streak: ${student.streak||0}일</div>
+      </div>
+    </div>
+    <div style="font-weight:700;margin-bottom:8px;">포인트별 진도</div>
+    <div class="dash-point-grid">`;
+
+  allPts.forEach(pt=>{
+    const key = `point_${String(pt.id).padStart(2,'0')}`;
+    const p = progress[key];
+    let cls = 'none', label = `P${pt.id}`;
+    if(p){
+      if(p.studied && p.practiced) { cls = 'done'; label += ' ✓'; }
+      else { cls = 'partial'; label += p.studied ? ' 📖' : ' ✏️'; }
+    }
+    html += `<div class="dash-point-chip ${cls}" title="${pt.title}">${label}</div>`;
+  });
+
+  html += `</div>
+    <div style="margin-top:12px;font-size:.82rem;color:var(--text3);">
+      ✓ = 학습+연습 완료 | 📖 = 학습만 | ✏️ = 연습만 | 빈칸 = 미학습
+    </div>
+  </div>`;
+  area.innerHTML = html;
+  area.scrollIntoView({ behavior: 'smooth' });
+}

@@ -491,6 +491,88 @@ body {
 .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-state p { font-size: 1rem; }
 
+/* ─── AUTH UI ─── */
+.auth-btn {
+  padding: 6px 14px; border-radius: 99px; border: 2px solid var(--border);
+  background: var(--surface); font-family: inherit; font-size: .82rem;
+  font-weight: 600; cursor: pointer; transition: all .2s; color: var(--text2);
+  white-space: nowrap;
+}
+.auth-btn:hover { border-color: var(--primary); color: var(--primary-dark); }
+.auth-btn.logout { font-size: .75rem; padding: 4px 10px; color: var(--text3); border-color: transparent; }
+.auth-btn.logout:hover { color: var(--red); }
+.user-info {
+  display: flex; align-items: center; gap: 8px;
+}
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--primary-light);
+}
+.user-name {
+  font-size: .82rem; font-weight: 600; color: var(--text);
+  max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ─── LOGIN MODAL ─── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); padding: 32px; width: 90%; max-width: 400px;
+  position: relative; animation: modalIn .25s ease-out;
+}
+@keyframes modalIn { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-close {
+  position: absolute; top: 12px; right: 12px;
+  background: none; border: none; font-size: 1.2rem; cursor: pointer;
+  color: var(--text3); padding: 4px 8px; border-radius: 6px;
+}
+.modal-close:hover { background: var(--surface2); color: var(--text); }
+
+/* ─── DASHBOARD ─── */
+.dash-table {
+  width: 100%; border-collapse: collapse; font-size: .85rem;
+}
+.dash-table th, .dash-table td {
+  padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
+}
+.dash-table th {
+  background: var(--surface2); font-weight: 700; color: var(--text2);
+  position: sticky; top: 0;
+}
+.dash-table tr:hover td { background: #F0FDF4; }
+.dash-table .student-name {
+  display: flex; align-items: center; gap: 8px; font-weight: 600;
+}
+.dash-table .student-name img {
+  width: 24px; height: 24px; border-radius: 50%;
+}
+.dash-progress-bar {
+  width: 80px; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; display: inline-block; vertical-align: middle;
+}
+.dash-progress-fill { height: 100%; background: var(--primary); border-radius: 99px; }
+.dash-detail-card {
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 16px; margin-top: 16px;
+}
+.dash-point-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px; margin-top: 12px;
+}
+.dash-point-chip {
+  padding: 6px 8px; border-radius: 6px; text-align: center;
+  font-size: .75rem; font-weight: 600;
+}
+.dash-point-chip.done { background: var(--primary-light); color: #065F46; }
+.dash-point-chip.partial { background: #FEF3C7; color: #92400E; }
+.dash-point-chip.none { background: var(--surface); color: var(--text3); border: 1px solid var(--border); }
+.teacher-badge {
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white;
+  padding: 2px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700;
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 640px) {
   .point-grid { grid-template-columns: 1fr 1fr; }
@@ -499,4 +581,6 @@ body {
   .header-tabs .tab-btn .tab-text { display: none; }
   .tab-btn { padding: 8px 12px; }
   .page-wrap { padding: 16px 14px; }
+  .user-name { display: none; }
+  .auth-btn { padding: 4px 10px; font-size: .75rem; }
 }
