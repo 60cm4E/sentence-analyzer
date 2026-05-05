@@ -789,16 +789,21 @@ function shuffle(arr){
       if(user){
         currentUser = user;
         isTeacher = false;
-        await ensureStudentDoc(user);
-        // Firestore에서 XP/streak 복원
-        if(studentDoc){
-          State.xp = studentDoc.xp || 0;
-          State.streak = studentDoc.streak || 0;
-          $('xpCount').textContent = State.xp;
-          $('streakCount').textContent = State.streak;
-          save();
+        try {
+          await ensureStudentDoc(user);
+          // Firestore에서 XP/streak 복원
+          if(studentDoc){
+            State.xp = studentDoc.xp || 0;
+            State.streak = studentDoc.streak || 0;
+            $('xpCount').textContent = State.xp;
+            $('streakCount').textContent = State.streak;
+            save();
+          }
+        } catch(e) {
+          console.warn('Student doc error (continuing):', e);
         }
         updateAuthUI();
+        closeLoginModalFn();
         showToast(`👋 ${user.displayName || '학생'}님 환영합니다!`);
       } else {
         currentUser = null;
